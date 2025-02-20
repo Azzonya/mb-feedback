@@ -14,8 +14,7 @@ func (e Err) Error() string {
 }
 
 const (
-	InvalidInput          = Err("invalid_input")
-	UserNotFound          = Err("user_not_found")
-	UsernameAlreadyExists = Err("username_already_exists")
-	InvalidPassword       = Err("invalid_password")
+	InvalidInput   = Err("invalid_input")
+	BadStatusCode  = Err("bad_status_code")
+	ObjectNotFound = Err("object_not_found")
 )

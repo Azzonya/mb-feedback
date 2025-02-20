@@ -2,15 +2,21 @@ package conf
 
 import "github.com/caarlos0/env/v9"
 
-// Conf represents the application configuration.
 var Conf = struct {
-	ServerAddress string `env:"server_address"`
+	HTTPListen string `env:"HTTP_LISTEN"`
 
-	PgDsn string `env:"DATABASE_URI"`
+	MbBrokerURL   string `env:"mb_broker_url"`
+	MbBrokerToken string `env:"mb_broker_token"`
+
+	VoximplantURL        string `env:"voximplant_url"`
+	VoximplantToken      string `env:"voximplant_token"`
+	VoximplantDomainName string `env:"voximplant_domain_name"`
+	VoximplantTemplateID string `env:"voximplant_template_id"`
+	VoximplantChannelID  string `env:"voximplant_channel_id"`
+
+	PgDsn string `env:"pg_dsn"`
 }{}
 
-// init initializes the configuration by parsing environment variables.
-// It sets default values for fields.
 func init() {
 	if err := env.Parse(&Conf); err != nil {
 		panic(err)

@@ -11,6 +11,7 @@ type Order struct {
 	ID              string
 	ExternalOrderID string
 	UserPhone       string
+	UserName        string
 	CreatedAt       time.Time
 }
 
@@ -43,8 +44,8 @@ type ListPars struct {
 // Edit represents the editable fields for updating an existing record,
 // allowing partial updates to fields like UserPhone and timestamps.
 type Edit struct {
-	ID              string
 	ExternalOrderID string
 	UserPhone       *string
+	UserName        *string
 	CreatedAt       *time.Time
 }

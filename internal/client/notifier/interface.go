@@ -1,5 +1,7 @@
 package notifier
 
+import "context"
+
 type Notifier interface {
-	SendNotification(clientID, channelID, templateID, headerParam, buttonURLParam string) error
+	SendNotification(ctx context.Context, orderID, userPhone, userName, productCode string) error
 }

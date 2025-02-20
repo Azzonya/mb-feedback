@@ -14,6 +14,14 @@ type OrderDetail struct {
 	CreatedAt   time.Time
 }
 
+type OrderDetailWithUserInfo struct {
+	ID          string
+	OrderID     string
+	UserPhone   string
+	UserName    string
+	ProductCode string
+}
+
 // GetPars defines parameters for querying specific records,
 // allowing filtering by ID, OrderID or ProductCode.
 type GetPars struct {

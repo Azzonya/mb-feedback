@@ -5,6 +5,7 @@ package pg
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -55,7 +56,7 @@ func (r *Repo) Get(ctx context.Context, pars *model.GetPars) (*model.Order, bool
 		return nil, false, err
 	}
 
-	err = r.Con.QueryRow(ctx, sql, args...).Scan(&result.ID, &result.ExternalOrderID, &result.UserPhone, &result.CreatedAt)
+	err = r.Con.QueryRow(ctx, sql, args...).Scan(&result.ID, &result.ExternalOrderID, &result.UserPhone, &result.UserName, &result.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false, nil
@@ -71,7 +72,7 @@ func (r *Repo) Get(ctx context.Context, pars *model.GetPars) (*model.Order, bool
 // of items, the total count, and any error encountered.
 func (r *Repo) List(ctx context.Context, pars *model.ListPars) ([]*model.Order, int64, error) {
 	queryBuilder := squirrel.
-		Select("id", "external_order_id", "user_phone", "created_at").
+		Select("id", "external_order_id", "user_phone", "user_name", "created_at").
 		From("ord")
 
 	if pars.ID != nil {
@@ -121,7 +122,7 @@ func (r *Repo) List(ctx context.Context, pars *model.ListPars) ([]*model.Order, 
 	var result []*model.Order
 	for rows.Next() {
 		var data model.Order
-		err = rows.Scan(&data.ID, &data.ExternalOrderID, &data.UserPhone, &data.CreatedAt)
+		err = rows.Scan(&data.ID, &data.ExternalOrderID, &data.UserPhone, &data.UserName, &data.CreatedAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -135,12 +136,49 @@ func (r *Repo) List(ctx context.Context, pars *model.ListPars) ([]*model.Order, 
 	return result, int64(len(result)), nil
 }
 
+func (r *Repo) ListOrdersNotInDetails(ctx context.Context, pars *model.ListPars) ([]*model.Order, error) {
+	queryBuilder := squirrel.
+		Select("o.id", "o.external_order_id", "o.user_phone", "o.user_name", "o.created_at").
+		From("ord o").
+		LeftJoin("ord_detail od ON o.id = od.order_id").
+		Where("od.order_id IS NULL")
+	if pars.CreatedAfter != nil {
+		queryBuilder = queryBuilder.Where(squirrel.GtOrEq{"o.created_at": pars.CreatedAfter})
+	}
+
+	sql, args, err := queryBuilder.PlaceholderFormat(squirrel.Dollar).ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	rows, err := r.Con.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []*model.Order
+	for rows.Next() {
+		var order model.Order
+		if err := rows.Scan(&order.ID, &order.ExternalOrderID, &order.UserPhone, &order.UserName, &order.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		orders = append(orders, &order)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+
+	return orders, nil
+}
+
 // Create inserts a new order into the database based on the provided Edit object,
 // returning any error encountered.
 func (r *Repo) Create(ctx context.Context, obj *model.Edit) error {
 	insert := squirrel.Insert("ord").
-		Columns("external_order_id", "user_phone").
-		Values(obj.ExternalOrderID, obj.UserPhone).
+		Columns("external_order_id", "user_phone", "user_name").
+		Values(obj.ExternalOrderID, obj.UserPhone, obj.UserName).
 		PlaceholderFormat(squirrel.Dollar)
 
 	query, args, err := insert.ToSql()
@@ -152,6 +190,26 @@ func (r *Repo) Create(ctx context.Context, obj *model.Edit) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (r *Repo) CreateBatch(ctx context.Context, objects []*model.Edit) error {
+
+	query := squirrel.Insert("ord").Columns("external_order_id", "user_phone", "user_name")
+
+	for _, obj := range objects {
+		query = query.Values(obj.ExternalOrderID, *obj.UserPhone, obj.UserName)
+	}
+
+	sql, args, err := query.PlaceholderFormat(squirrel.Dollar).ToSql()
+	if err != nil {
+		return fmt.Errorf("failed to build query: %w", err)
+	}
+
+	if _, err := r.Con.Exec(ctx, sql, args...); err != nil {
+		return fmt.Errorf("failed to execute batch insert: %w", err)
+	}
+
 	return nil
 }
 

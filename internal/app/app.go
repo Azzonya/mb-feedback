@@ -1,5 +1,3 @@
-// Package app provides functionality to initialize, start, and stop the gophKeeper application.
-// It sets up the GRPC server, repository, and database connections based on the configuration.
 package app
 
 import (
@@ -7,24 +5,57 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
-	"mb-feedback/internal/api"
+	mb_broker "mb-feedback/internal/client/fetcher/mb-broker"
+	"mb-feedback/internal/client/notifier/voximplant"
 	"mb-feedback/internal/conf"
+	notificationRepoPG "mb-feedback/internal/domain/notification/repo/pg"
+	NotificationService "mb-feedback/internal/domain/notification/service"
+	orderRepoFetcher "mb-feedback/internal/domain/order/repo/fetcher"
+	orderRepoPG "mb-feedback/internal/domain/order/repo/pg"
+	OrderService "mb-feedback/internal/domain/order/service"
+	orderDetailRepoFetcher "mb-feedback/internal/domain/order_detail/repo/fetcher"
+	orderDetailRepoPG "mb-feedback/internal/domain/order_detail/repo/pg"
+	OrderDetailService "mb-feedback/internal/domain/order_detail/service"
+	"mb-feedback/internal/handler/rest"
+	NotificationUsecase "mb-feedback/internal/usecase/notification"
+	OrderUsecase "mb-feedback/internal/usecase/order"
+	OrderDetailUsecase "mb-feedback/internal/usecase/order_detail"
 	"os"
 	"os/signal"
+	"syscall"
 )
 
-// App represent the application state containing configuration, GRPC server, database connection, and repository.
 type App struct {
 	pgpool *pgxpool.Pool
 
-	api *api.Rest
+	mbBrokerClient   *mb_broker.Client
+	voximplantClient *voximplant.Client
+
+	// order
+	orderUsc *OrderUsecase.Usecase
+	orderSrv *OrderService.Service
+
+	// order-detail
+	orderDetailUsc *OrderDetailUsecase.Usecase
+	orderDetailSrv *OrderDetailService.Service
+
+	// notification
+	notificationUsc *NotificationUsecase.Usecase
+	notificationSrv *NotificationService.Service
+
+	httpServer *rest.Rest
 
 	exitCode int
 }
 
-// Init initializes the application with the provided configuration
 func (a *App) Init() {
 	var err error
+
+	// logger
+	{
+		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+		slog.SetDefault(logger)
+	}
 
 	// pgpool
 	{
@@ -32,31 +63,87 @@ func (a *App) Init() {
 		errCheck(err, "pgxpool.New")
 	}
 
+	// mb-broker client
+	{
+		a.mbBrokerClient = mb_broker.New(conf.Conf.MbBrokerURL, conf.Conf.MbBrokerToken)
+	}
+
+	// voximplant
+	{
+		a.voximplantClient = voximplant.New(
+			conf.Conf.VoximplantURL,
+			conf.Conf.VoximplantToken,
+			conf.Conf.VoximplantDomainName,
+			conf.Conf.VoximplantTemplateID,
+			conf.Conf.VoximplantChannelID)
+	}
+
+	// order
+	{
+		orderRepoDB := orderRepoPG.New(a.pgpool)
+		orderFetcherRepo := orderRepoFetcher.New(a.mbBrokerClient)
+
+		a.orderSrv = OrderService.New(orderRepoDB, orderFetcherRepo)
+		a.orderUsc = OrderUsecase.New(a.orderSrv)
+	}
+
+	// order-detail
+	{
+		orderDetailRepoDB := orderDetailRepoPG.New(a.pgpool)
+		orderDetailFetcherRepo := orderDetailRepoFetcher.New(a.mbBrokerClient)
+		a.orderDetailSrv = OrderDetailService.New(orderDetailRepoDB, orderDetailFetcherRepo)
+
+		a.orderDetailUsc = OrderDetailUsecase.New(a.orderSrv, a.orderDetailSrv)
+	}
+
+	// notification
+	{
+		notificationRepoDB := notificationRepoPG.New(a.pgpool)
+
+		a.notificationSrv = NotificationService.New(notificationRepoDB, a.voximplantClient)
+		a.notificationUsc = NotificationUsecase.New(a.orderDetailSrv, a.notificationSrv)
+	}
+
+	// http-server
+	{
+		a.httpServer = rest.New(a.orderUsc, a.orderDetailUsc, a.notificationUsc)
+	}
 }
 
-// Start starts the application, initializing and running GRPC server.
 func (a *App) Start() {
 	slog.Info("Starting")
 
+	// http-server
+	{
+		a.httpServer.Start(conf.Conf.HTTPListen)
+	}
 }
 
-// Listen listens for signals to stop the application
 func (a *App) Listen() {
-	signalCtx, signalCtxCancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer signalCtxCancel()
-
-	// wait signal
-	<-signalCtx.Done()
+	select {
+	case <-StopSignal():
+	case <-a.httpServer.ErrorChan:
+	}
 }
 
-// Stop stops the application, shutting down the GRPC server.
+func StopSignal() <-chan os.Signal {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	return ch
+}
+
 func (a *App) Stop() {
 	slog.Info("Shutting down...")
 
+	// http-server
+	{
+		err := a.httpServer.Stop()
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
-// Exit gracefully shuts down the application by logging the exit action
-// and then terminating the program with the specified exit code.
 func (a *App) Exit() {
 	slog.Info("Exit")
 

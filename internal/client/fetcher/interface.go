@@ -1,6 +1,11 @@
 package fetcher
 
+import (
+	"context"
+	orderModel "mb-feedback/internal/domain/order/model"
+)
+
 type Fetcher interface {
-	FetchCompletedOrders()
-	FetchProductCodesByOrder(orderID string) ([]string, error)
+	FetchCompletedOrders(ctx context.Context) ([]*orderModel.Order, error)
+	FetchProductCodesByOrder(ctx context.Context, orderID string) ([]string, error)
 }

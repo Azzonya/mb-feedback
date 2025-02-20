@@ -2,64 +2,81 @@ package service
 
 import (
 	"context"
-	"mb-feedback/internal/client/fetcher"
+	"fmt"
+	"github.com/jackc/pgx/v5"
 	"mb-feedback/internal/domain/order_detail/model"
+	"mb-feedback/internal/errs"
 )
 
-// Service provides methods to manage OrderDetail, handling password operations,
-// user validation, and CRUD operations through the repository interface.
 type Service struct {
-	repoDB  RepoDBI
-	fetcher fetcher.Fetcher
+	repoDB      RepoDBI
+	repoFetcher RepoFetcherI
 }
 
-// New creates a new Service instance with the given database repository.
-func New(repoDB RepoDBI, fetcher fetcher.Fetcher) *Service {
+func New(repoDB RepoDBI, repoFetcher RepoFetcherI) *Service {
 	return &Service{
-		repoDB:  repoDB,
-		fetcher: fetcher,
+		repoDB:      repoDB,
+		repoFetcher: repoFetcher,
 	}
 }
 
-// RepoDBI defines the interface for database interactions related to OrderDetails.
-// It includes methods for retrieving, listing, creating, updating, deleting, and checking
-// the existence of users in the database.
 type RepoDBI interface {
 	Get(ctx context.Context, pars *model.GetPars) (*model.OrderDetail, bool, error)
 	List(ctx context.Context, pars *model.ListPars) ([]*model.OrderDetail, int64, error)
+	ListDetailNotInNotification(ctx context.Context, pars *model.ListPars) ([]*model.OrderDetailWithUserInfo, error)
 	Create(ctx context.Context, obj *model.Edit) error
+	CreateBatch(ctx context.Context, objects []*model.Edit) error
 	Update(ctx context.Context, pars *model.GetPars, obj *model.Edit) error
 	Delete(ctx context.Context, pars *model.GetPars) error
-	Exists(ctx context.Context, pars *model.GetPars) (bool, error)
+	BeginTx(ctx context.Context) (pgx.Tx, error)
+	HandleTxCompletion(tx pgx.Tx, err *error)
 }
 
-// List retrieves a list of OrderDetails based on the provided filtering parameters,
-// delegating the operation to the database repository.
-func (s *Service) List(ctx context.Context, pars *model.ListPars) ([]*model.OrderDetail, int64, error) {
+type RepoFetcherI interface {
+	FetchProductCodes(ctx context.Context, externalOrderID string) ([]string, error)
+}
+
+func (s *Service) list(ctx context.Context, pars *model.ListPars) ([]*model.OrderDetail, int64, error) {
 	return s.repoDB.List(ctx, pars)
 }
 
-// Create stores a new OrderDetail in the database.
-func (s *Service) Create(ctx context.Context, obj *model.Edit) error {
+// ListDetailWithoutNotification retrieves a list of OrderDetails with UserInfo based on the provided filtering parameters,
+// delegating the operation to the database repository.
+func (s *Service) ListDetailWithoutNotification(ctx context.Context, pars *model.ListPars) ([]*model.OrderDetailWithUserInfo, error) {
+	return s.repoDB.ListDetailNotInNotification(ctx, pars)
+}
+
+func (s *Service) create(ctx context.Context, obj *model.Edit) error {
 	return s.repoDB.Create(ctx, obj)
 }
 
-// Get retrieves a OrderDetail from the database based on the provided query parameters.
-func (s *Service) Get(ctx context.Context, pars *model.GetPars) (*model.OrderDetail, bool, error) {
-	return s.repoDB.Get(ctx, pars)
+func (s *Service) CreateList(ctx context.Context, objs []*model.Edit) error {
+	return s.repoDB.CreateBatch(ctx, objs)
 }
 
-// Update modifies an existing user account in the database.
-func (s *Service) Update(ctx context.Context, pars *model.GetPars, obj *model.Edit) error {
+func (s *Service) get(ctx context.Context, pars *model.GetPars, errNE bool) (*model.OrderDetail, bool, error) {
+	result, found, err := s.repoDB.Get(ctx, pars)
+	if err != nil {
+		return nil, false, fmt.Errorf("repoDb.Get: %w", err)
+	}
+	if !found {
+		if errNE {
+			return nil, false, errs.ObjectNotFound
+		}
+		return nil, false, nil
+	}
+
+	return result, found, nil
+}
+
+func (s *Service) update(ctx context.Context, pars *model.GetPars, obj *model.Edit) error {
 	return s.repoDB.Update(ctx, pars, obj)
 }
 
-// Delete removes a OrderDetail from the database.
-func (s *Service) Delete(ctx context.Context, pars *model.GetPars) error {
+func (s *Service) delete(ctx context.Context, pars *model.GetPars) error {
 	return s.repoDB.Delete(ctx, pars)
 }
 
-// Exists checks whether a OrderDetail exists in the database based on the provided query parameters.
-func (s *Service) Exists(ctx context.Context, pars *model.GetPars) (bool, error) {
-	return s.repoDB.Exists(ctx, pars)
+func (s *Service) FetchProductCodesByOrder(ctx context.Context, externalOrderID string) ([]string, error) {
+	return s.repoFetcher.FetchProductCodes(ctx, externalOrderID)
 }

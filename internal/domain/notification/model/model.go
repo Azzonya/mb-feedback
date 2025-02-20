@@ -1,13 +1,13 @@
 // Package model defines the core data structures used in the application
-// for storing and managing sms information. The package also provides
+// for storing and managing notification information. The package also provides
 // structures for handling query parameters and editing operations.
 package model
 
 import "time"
 
-// Sms represents the core data entity, storing sms data,
+// Notification represents the core data entity, storing notification data,
 // including the OrderItemID, PhoneNumber, Status and associated timestamps.
-type Sms struct {
+type Notification struct {
 	ID          string
 	OrderItemID string
 	PhoneNumber string
@@ -39,6 +39,8 @@ type ListPars struct {
 	OrderItemIDs  *[]string
 	PhoneNumber   *string
 	PhoneNumbers  *[]string
+	Status        *string
+	Statuses      *[]string
 	SentBefore    *time.Time
 	SentAfter     *time.Time
 	CreatedBefore *time.Time
@@ -48,7 +50,9 @@ type ListPars struct {
 // Edit represents the editable fields for updating an existing record,
 // allowing partial updates to fields like Status and timestamps.
 type Edit struct {
-	ID     string
-	Status *string
-	SentAt *time.Time
+	ID          string
+	OrderItemID *string
+	PhoneNumber *string
+	Status      *string
+	SentAt      *time.Time
 }
