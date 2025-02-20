@@ -13,10 +13,3 @@ func main() {
 	a.Stop()
 	a.Exit()
 }
-
-/**
- * Your TimeMap object will be instantiated and called as such:
- * obj := Constructor();
- * obj.Set(key,value,timestamp);
- * param_2 := obj.Get(key,timestamp);
- */
