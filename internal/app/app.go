@@ -111,6 +111,19 @@ func (a *App) Init() {
 }
 
 func (a *App) Start() {
+
+	// recover
+	{
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("panic recovered in Start", "panic", r)
+
+				a.exitCode = 2
+				os.Exit(a.exitCode)
+			}
+		}()
+	}
+
 	slog.Info("Starting")
 
 	// http-server

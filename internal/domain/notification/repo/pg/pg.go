@@ -1,5 +1,3 @@
-// Package pg provides a PostgreSQL-based implementation for managing notifications,
-// including operations such as retrieving, listing, creating, updating, and deleting records.
 package pg
 
 import (
@@ -12,21 +10,16 @@ import (
 	"mb-feedback/internal/errs"
 )
 
-// Repo provides methods to interact with the PostgreSQL database for order operations.
-// It holds a connection pool to manage database connections.
 type Repo struct {
 	Con *pgxpool.Pool
 }
 
-// New creates a new instance of Repo with the given PostgreSQL connection pool.
 func New(con *pgxpool.Pool) *Repo {
 	return &Repo{
 		con,
 	}
 }
 
-// Get retrieves a single data item based on the provided query parameters.
-// It returns the item if found, a boolean indicating its existence, and any error encountered.
 func (r *Repo) Get(ctx context.Context, pars *model.GetPars) (*model.Notification, bool, error) {
 	if !pars.IsValid() {
 		return nil, false, errs.InvalidInput
@@ -70,9 +63,6 @@ func (r *Repo) Get(ctx context.Context, pars *model.GetPars) (*model.Notificatio
 	return &result, true, nil
 }
 
-// List retrieves multiple order based on the provided query parameters,
-// supporting filters like ID, ExternalOrderID, UserPhone, and timestamps. It returns the list
-// of items, the total count, and any error encountered.
 func (r *Repo) List(ctx context.Context, pars *model.ListPars) ([]*model.Notification, int64, error) {
 	queryBuilder := squirrel.
 		Select("id", "order_item_id", "phone_number", "status", "sent_at", "created_at").
@@ -147,8 +137,6 @@ func (r *Repo) List(ctx context.Context, pars *model.ListPars) ([]*model.Notific
 	return result, int64(len(result)), nil
 }
 
-// Create inserts a new order into the database based on the provided Edit object,
-// returning any error encountered.
 func (r *Repo) Create(ctx context.Context, obj *model.Edit) error {
 	insert := squirrel.Insert("notification").
 		Columns("order_item_id", "phone_number", "status", "sent_at").
@@ -167,8 +155,6 @@ func (r *Repo) Create(ctx context.Context, obj *model.Edit) error {
 	return nil
 }
 
-// Update modifies an existing data item based on the provided query parameters and Edit object,
-// returning any error encountered during the operation.
 func (r *Repo) Update(ctx context.Context, pars *model.GetPars, obj *model.Edit) error {
 	if !pars.IsValid() {
 		return errs.InvalidInput
@@ -193,8 +179,6 @@ func (r *Repo) Update(ctx context.Context, pars *model.GetPars, obj *model.Edit)
 	return err
 }
 
-// Delete removes a order from the database based on the provided query parameters,
-// returning any error encountered during the operation.
 func (r *Repo) Delete(ctx context.Context, pars *model.GetPars) error {
 	if !pars.IsValid() {
 		return errs.InvalidInput

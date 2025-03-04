@@ -3,8 +3,6 @@ package order_detail
 import (
 	"context"
 	"fmt"
-	"time"
-
 	orderModel "mb-feedback/internal/domain/order/model"
 	orderDetailModel "mb-feedback/internal/domain/order_detail/model"
 )
@@ -31,10 +29,10 @@ func New(orderService OrderServiceI, orderDetailService OrderDetailServiceI) *Us
 }
 
 func (u *Usecase) FetchProductCodes(ctx context.Context) error {
-	createdAfter := time.Now().Add(-time.Hour) // заказы за крайний час
+	//createdAfter := time.Now().Add(-time.Hour) // заказы за крайний час
 
 	missingOrders, err := u.orderService.ListOrdersWithoutDetails(ctx, &orderModel.ListPars{
-		CreatedAfter: &createdAfter,
+		//CreatedAfter: &createdAfter,
 	})
 	if err != nil {
 		return err

@@ -13,14 +13,15 @@ func (s *Rest) FetchOrdersHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		slog.Info("Updating orders")
+
 		s.updateOrderMutex.Lock()
+		defer s.updateOrderMutex.Unlock()
 		err := s.orderUsc.FetchNewOrders(context.Background())
 		if err != nil {
 			slog.Error("Error updating orders: ", "error", err)
 		} else {
 			slog.Info("Updated orders")
 		}
-		s.updateOrderMutex.Unlock()
 	}()
 }
 
@@ -33,13 +34,13 @@ func (s *Rest) GetProductCodesHandler(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Fetching product codes")
 
 		s.getProductCodeMutex.Lock()
+		defer s.getProductCodeMutex.Unlock()
 		err := s.orderDetailUsc.FetchProductCodes(context.Background())
 		if err != nil {
 			slog.Error("Error fetching product codes: ", err)
 		} else {
 			slog.Info("Fetched product codes")
 		}
-		s.getProductCodeMutex.Unlock()
 	}()
 }
 
@@ -52,12 +53,12 @@ func (s *Rest) SendNotificationHandler(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Sending notifications")
 
 		s.sendNotificationMutex.Lock()
+		defer s.sendNotificationMutex.Unlock()
 		err := s.notificationUsc.SendNotification(context.Background())
 		if err != nil {
 			slog.Error("Error sending notification: ", err)
 		} else {
 			slog.Info("Sent notification")
 		}
-		s.sendNotificationMutex.Unlock()
 	}()
 }
