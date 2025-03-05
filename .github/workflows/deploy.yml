@@ -1,0 +1,42 @@
+name: Deploy
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    env:
+      OWNER: Azzonya
+      IMAGE: mb-feedback
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.20.0'
+          cache: true
+
+      - run: go mod download
+
+      - id: cache-swag
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/swag
+          key: ${{ runner.os }}-go-swag-1.8.12
+      - if: steps.cache-swag.outputs.cache-hit != 'true'
+        run: GOBIN=~/swag go install github.com/swaggo/swag/cmd/swag@v1.8.12
+      - run: PATH=$PATH:~/swag make swdoc
+
+      - run: make
+
+      - run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u $ --password-stdin
+
+      - run: docker build -t ghcr.io/$OWNER/$IMAGE:latest .
+
+      - run: docker push ghcr.io/$OWNER/$IMAGE:latest
+
+#      - name: Deploy
+#        run: curl -f -k -X POST https://pr.zeon.mdev.kz/api/webhooks/aec6884c-9eba-4e26-ba6a-0a2379e5b24a
