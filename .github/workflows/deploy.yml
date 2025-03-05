@@ -11,24 +11,14 @@ jobs:
       OWNER: Azzonya
       IMAGE: mb-feedback
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
-          go-version: '>=1.20.0'
-          cache: true
+          go-version-file: go.mod
+          cache: false
 
       - run: go mod download
-
-      - id: cache-swag
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/swag
-          key: ${{ runner.os }}-go-swag-1.8.12
-      - if: steps.cache-swag.outputs.cache-hit != 'true'
-        run: GOBIN=~/swag go install github.com/swaggo/swag/cmd/swag@v1.8.12
-      - run: PATH=$PATH:~/swag make swdoc
 
       - run: make
 
