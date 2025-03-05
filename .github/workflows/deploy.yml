@@ -8,7 +8,7 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     env:
-      OWNER: Azzonya
+      OWNER: azzonya
       IMAGE: mb-feedback
     steps:
       - uses: actions/checkout@v4
